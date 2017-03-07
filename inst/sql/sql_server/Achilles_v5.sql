@@ -4075,11 +4075,11 @@ from (select d.drug_concept_id,
 	group by d.person_id, d.drug_concept_id) as cnt_q
 group by drug_concept_id, drg_cnt;
 
-insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
 with person_count as (select count(*) as total_persons from @cdm_database_schema.person)
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
 select 791 as analysis_id,
 	d_concept_id as stratum_1, 
-	round((person_cnt * 100.0)/total_persons ::numeric, 2) as stratum_2,
+	round((person_cnt * 100.0)/(total_persons * 1.0), 2) as stratum_2,
 	drug_cnt as count_value
 from #tempResults, person_count;
 
@@ -4534,7 +4534,7 @@ with person_count as (select count(*) as total_persons from @cdm_database_schema
 insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
 select 891 as analysis_id,
 	o_concept_id as stratum_1, 
-	round((person_cnt * 100.0)/total_persons ::numeric, 2) as stratum_2,
+	round((person_cnt * 100.0)/(total_persons * 1.0), 2) as stratum_2,
 	obs_cnt as count_value
 from #tempResults, person_count;
 
@@ -7512,11 +7512,11 @@ from (select m.measurement_concept_id,
 	group by m.person_id, m.measurement_concept_id) as cnt_q
 group by measurement_concept_id, meas_cnt;
 
-insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
 with person_count as (select count(*) as total_persons from @cdm_database_schema.person)
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
 select 1891 as analysis_id,
 	m_concept_id as stratum_1, 
-	round((person_cnt * 100.0)/total_persons ::numeric, 2) as stratum_2,
+	round((person_cnt * 100.0)/(total_persons * 1.0), 2) as stratum_2,
 	measure_cnt as count_value
 from #tempResults, person_count;
 
