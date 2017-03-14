@@ -84,6 +84,7 @@
 612,"Number of procedure occurrence records with invalid provider_id",,,,,
 613,"Number of procedure occurrence records with invalid visit_id",,,,,
 620,"Number of procedure occurrence records  by procedure occurrence start month","calendar month",,,,
+691,"Percentage of total persons that have at least x procedures","procedure_concept_id","procedure_person",,,
 700,"Number of persons with at least one drug exposure, by drug_concept_id","drug_concept_id",,,,
 701,"Number of drug exposure records, by drug_concept_id","drug_concept_id",,,,
 702,"Number of persons by drug exposure start month, by drug_concept_id","drug_concept_id","calendar month",,,

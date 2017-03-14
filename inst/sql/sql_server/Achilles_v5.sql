@@ -815,6 +815,8 @@ insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_na
 insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
 	values (620, 'Number of procedure occurrence records  by procedure occurrence start month', 'calendar month');
 
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name)
+	values (691, 'Percentage of total persons that have at least x procedures', 'procedure_id', 'procedure_person');
 
 --700- DRUG_EXPOSURE
 
@@ -3560,6 +3562,31 @@ group by YEAR(procedure_date)*100 + month(procedure_date)
 ;
 --}
 
+
+--{691 IN (@list_of_analysis_ids)}?{
+-- 691	Percentage of total persons that have at least x procedures
+create table #tempResults (p_concept_id int, proc_cnt int, person_cnt int);
+insert into #tempResults
+select procedure_concept_id, prc_cnt, sum(count(person_id))
+over (partition by procedure_concept_id order by prc_cnt desc)
+from (select p.procedure_concept_id, 
+	count(p.procedure_occurrence_id) as prc_cnt, 
+	p.person_id
+	from @cdm_database_schema.procedure_occurrence p 
+	group by p.person_id, p.procedure_concept_id) as cnt_q
+group by procedure_concept_id, prc_cnt;
+
+with person_count as (select count(*) as total_persons from @cdm_database_schema.person)
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
+select 691 as analysis_id,
+	p_concept_id as stratum_1, 
+	round((person_cnt * 100.0)/(total_persons * 1.0), 2) as stratum_2,
+	proc_cnt as count_value
+from #tempResults, person_count;
+
+truncate table #tempResults;
+drop table #tempResults;
+--}
 
 /********************************************
 
@@ -7753,12 +7780,14 @@ group by m.note_type_CONCEPT_ID
 
 --final processing of results
 delete from @results_database_schema.ACHILLES_results 
-where analysis_id <> 791 
+where analysis_id <> 691 
+	and analysis_id <> 791 
 	and analysis_id <> 891 
 	and analysis_id <> 1891 
 	and count_value <= @smallcellcount;
 delete from @results_database_schema.ACHILLES_results_dist 
-where analysis_id <> 791
+where analysis_id <> 691 
+	and analysis_id <> 791
 	and analysis_id <> 891
 	and analysis_id <> 1891
 	and count_value <= @smallcellcount;
