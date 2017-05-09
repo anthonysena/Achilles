@@ -7792,3 +7792,19 @@ where analysis_id <> 691
 	and analysis_id <> 1891
 	and count_value <= @smallcellcount;
 
+/**************************************************/
+/***** Add indexes to Achilles results tables *****/
+/**************************************************/
+CREATE INDEX achilles_results_analysis_id_idx
+  ON @results_database_schema.ACHILLES_results (analysis_id);
+CREATE INDEX achilles_results_stratum_1_idx
+  ON @results_database_schema.ACHILLES_results (stratum_1);
+CREATE INDEX achilles_results_stratum_2_idx
+  ON @results_database_schema.ACHILLES_results (stratum_2);
+
+CREATE INDEX achilles_results_dist_analysis_id_idx
+  ON @results_database_schema.ACHILLES_results_dist (analysis_id);
+CREATE INDEX achilles_results_dist_stratum_1_idx
+  ON @results_database_schema.ACHILLES_results_dist (stratum_1);
+CREATE INDEX achilles_results_dist_stratum_2_idx
+  ON @results_database_schema.ACHILLES_results_dist (stratum_2);
