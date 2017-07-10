@@ -1274,6 +1274,59 @@ insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_na
 	values (2201, 'Number of note records, by note_type_concept_id', 'note_type_concept_id');
 
 
+--9700- DRUG_EXPOSURE_SOURCE
+
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9700, 'Number of persons with at least one drug exposure, by drug_source_concept_id', 'drug_source_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9701, 'Number of drug exposure records, by drug_source_concept_id', 'drug_source_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name)
+	values (9702, 'Number of persons by drug exposure start month, by drug_source_concept_id', 'drug_source_concept_id', 'calendar month');	
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9703, 'Number of distinct drug exposure concepts per person');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name, stratum_3_name, stratum_4_name)
+	values (9704, 'Number of persons with at least one drug exposure, by drug_source_concept_id by calendar year by gender by age decile', 'drug_source_concept_id', 'calendar year', 'gender_concept_id', 'age decile');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name)
+	values (9705, 'Number of drug exposure records, by drug_source_concept_id by drug_type_concept_id', 'drug_source_concept_id', 'drug_type_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name)
+	values (9706, 'Distribution of age by drug_source_concept_id', 'drug_source_concept_id', 'gender_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9709, 'Number of drug exposure records with invalid person_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9710, 'Number of drug exposure records outside valid observation period');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9711, 'Number of drug exposure records with end date < start date');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9712, 'Number of drug exposure records with invalid provider_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name)
+	values (9713, 'Number of drug exposure records with invalid visit_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9715, 'Distribution of days_supply by drug_source_concept_id', 'drug_source_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9716, 'Distribution of refills by drug_source_concept_id', 'drug_source_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9717, 'Distribution of quantity by drug_source_concept_id', 'drug_source_concept_id');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name)
+	values (9720, 'Number of drug exposure records  by drug exposure start month', 'calendar month');
+
+insert into @results_database_schema.ACHILLES_analysis (analysis_id, analysis_name, stratum_1_name, stratum_2_name)
+	values (9791, 'Percentage of total persons that have at least x drug exposures', 'drug_source_concept_id', 'drug_person');
 
 
 --end of importing values into analysis lookup table
@@ -7775,6 +7828,529 @@ group by m.note_type_CONCEPT_ID
 --}
 
 
+/********************************************
+
+ACHILLES Analyses on DRUG_EXPOSURE (SOURCE) table
+
+*********************************************/
+
+
+
+
+--{9700 IN (@list_of_analysis_ids)}?{
+-- 9700	Number of persons with at least one drug occurrence, by drug_source_concept_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, count_value)
+select 9700 as analysis_id, 
+	CAST(de1.drug_source_concept_id AS VARCHAR(255)) as stratum_1,
+	COUNT_BIG(distinct de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+group by de1.drug_source_concept_id
+;
+--}
+
+
+--{9701 IN (@list_of_analysis_ids)}?{
+-- 9701	Number of drug occurrence records, by drug_source_concept_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, count_value)
+select 9701 as analysis_id, 
+	CAST(de1.drug_source_concept_id AS VARCHAR(255)) as stratum_1,
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+group by de1.drug_source_concept_id
+;
+--}
+
+
+
+--{9702 IN (@list_of_analysis_ids)}?{
+-- 9702	Number of persons by drug occurrence start month, by drug_source_concept_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
+select 9702 as analysis_id,   
+	CAST(de1.drug_source_concept_id AS VARCHAR(255)) as stratum_1,
+	CAST(YEAR(drug_exposure_start_date)*100 + month(drug_exposure_start_date) AS VARCHAR(255)) as stratum_2,
+	COUNT_BIG(distinct PERSON_ID) as count_value
+from
+@cdm_database_schema.drug_exposure de1
+group by de1.drug_source_concept_id, 
+	YEAR(drug_exposure_start_date)*100 + month(drug_exposure_start_date)
+;
+--}
+
+
+
+--{9703 IN (@list_of_analysis_ids)}?{
+-- 9703	Number of distinct drug exposure concepts per person
+with rawData(count_value) as
+(
+  select num_drugs as count_value
+	from
+	(
+		select de1.person_id, COUNT_BIG(distinct de1.drug_source_concept_id) as num_drugs
+		from
+		@cdm_database_schema.drug_exposure de1
+		group by de1.person_id
+	) t0
+),
+overallStats (avg_value, stdev_value, min_value, max_value, total) as
+(
+  select CAST(avg(1.0 * count_value) AS FLOAT) as avg_value,
+    CAST(stdev(count_value) AS FLOAT) as stdev_value,
+    min(count_value) as min_value,
+    max(count_value) as max_value,
+    count_big(*) as total
+  from rawData
+),
+statsView (count_value, total, rn) as
+(
+  select count_value, 
+  	count_big(*) as total, 
+		row_number() over (order by count_value) as rn
+  FROM rawData
+  group by count_value
+),
+priorStats (count_value, total, accumulated) as
+(
+  select s.count_value, s.total, sum(p.total) as accumulated
+  from statsView s
+  join statsView p on p.rn <= s.rn
+  group by s.count_value, s.total, s.rn
+)
+select 9703 as analysis_id,
+  o.total as count_value,
+  o.min_value,
+	o.max_value,
+	o.avg_value,
+	o.stdev_value,
+	MIN(case when p.accumulated >= .50 * o.total then count_value else o.max_value end) as median_value,
+	MIN(case when p.accumulated >= .10 * o.total then count_value else o.max_value end) as p10_value,
+	MIN(case when p.accumulated >= .25 * o.total then count_value else o.max_value end) as p25_value,
+	MIN(case when p.accumulated >= .75 * o.total then count_value else o.max_value end) as p75_value,
+	MIN(case when p.accumulated >= .90 * o.total then count_value else o.max_value end) as p90_value
+into #tempResults
+from priorStats p
+CROSS JOIN overallStats o
+GROUP BY o.total, o.min_value, o.max_value, o.avg_value, o.stdev_value
+;
+
+insert into @results_database_schema.ACHILLES_results_dist (analysis_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value)
+select analysis_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value
+from #tempResults
+;
+
+truncate table #tempResults;
+drop table #tempResults;
+
+--}
+
+
+
+--{9704 IN (@list_of_analysis_ids)}?{
+-- 9704	Number of persons with at least one drug occurrence, by drug_source_concept_id by calendar year by gender by age decile
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, stratum_3, stratum_4, count_value)
+select 9704 as analysis_id,   
+	CAST(de1.drug_source_concept_id AS VARCHAR(255)) as stratum_1,
+	CAST(YEAR(drug_exposure_start_date) AS VARCHAR(255)) as stratum_2,
+	CAST(p1.gender_concept_id AS VARCHAR(255)) as stratum_3,
+	CAST(floor((year(drug_exposure_start_date) - p1.year_of_birth)/10) AS VARCHAR(255)) as stratum_4,
+	COUNT_BIG(distinct p1.PERSON_ID) as count_value
+from @cdm_database_schema.PERSON p1
+inner join
+@cdm_database_schema.drug_exposure de1
+on p1.person_id = de1.person_id
+group by de1.drug_source_concept_id, 
+	YEAR(drug_exposure_start_date),
+	p1.gender_concept_id,
+	floor((year(drug_exposure_start_date) - p1.year_of_birth)/10)
+;
+--}
+
+--{9705 IN (@list_of_analysis_ids)}?{
+-- 9705	Number of drug occurrence records, by drug_source_concept_id by drug_type_concept_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
+select 9705 as analysis_id, 
+	CAST(de1.drug_source_concept_id AS VARCHAR(255)) as stratum_1,
+	CAST(de1.drug_type_concept_id AS VARCHAR(255)) as stratum_2,
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+group by de1.drug_source_concept_id,	
+	de1.drug_type_concept_id
+;
+--}
+
+
+
+--{9706 IN (@list_of_analysis_ids)}?{
+-- 9706	Distribution of age by drug_concept_id
+select de1.drug_source_concept_id as subject_id,
+  p1.gender_concept_id,
+	de1.drug_start_year - p1.year_of_birth as count_value
+INTO #rawData_9706
+from @cdm_database_schema.PERSON p1
+inner join
+(
+	select person_id, drug_source_concept_id, min(year(drug_exposure_start_date)) as drug_start_year
+	from @cdm_database_schema.drug_exposure
+	group by person_id, drug_source_concept_id
+) de1 on p1.person_id = de1.person_id
+;
+
+with overallStats (stratum1_id, stratum2_id, avg_value, stdev_value, min_value, max_value, total) as
+(
+  select subject_id as stratum1_id,
+    gender_concept_id as stratum2_id,
+    CAST(avg(1.0 * count_value) AS FLOAT) as avg_value,
+    CAST(stdev(count_value) AS FLOAT) as stdev_value,
+    min(count_value) as min_value,
+    max(count_value) as max_value,
+    count_big(*) as total
+  FROM #rawData_9706
+	group by subject_id, gender_concept_id
+),
+statsView (stratum1_id, stratum2_id, count_value, total, rn) as
+(
+  select subject_id as stratum1_id, gender_concept_id as stratum2_id, count_value, count_big(*) as total, row_number() over (partition by subject_id, gender_concept_id order by count_value) as rn
+  FROM #rawData_9706
+  group by subject_id, gender_concept_id, count_value
+),
+priorStats (stratum1_id, stratum2_id, count_value, total, accumulated) as
+(
+  select s.stratum1_id, s.stratum2_id, s.count_value, s.total, sum(p.total) as accumulated
+  from statsView s
+  join statsView p on s.stratum1_id = p.stratum1_id and s.stratum2_id = p.stratum2_id and p.rn <= s.rn
+  group by s.stratum1_id, s.stratum2_id, s.count_value, s.total, s.rn
+)
+select 9706 as analysis_id,
+  CAST(o.stratum1_id AS VARCHAR(255)) AS stratum1_id,
+  CAST(o.stratum2_id AS VARCHAR(255)) AS stratum2_id,
+  o.total as count_value,
+  o.min_value,
+	o.max_value,
+	o.avg_value,
+	o.stdev_value,
+	MIN(case when p.accumulated >= .50 * o.total then count_value else o.max_value end) as median_value,
+	MIN(case when p.accumulated >= .10 * o.total then count_value else o.max_value end) as p10_value,
+	MIN(case when p.accumulated >= .25 * o.total then count_value else o.max_value end) as p25_value,
+	MIN(case when p.accumulated >= .75 * o.total then count_value else o.max_value end) as p75_value,
+	MIN(case when p.accumulated >= .90 * o.total then count_value else o.max_value end) as p90_value
+into #tempResults
+from priorStats p
+join overallStats o on p.stratum1_id = o.stratum1_id and p.stratum2_id = o.stratum2_id 
+GROUP BY o.stratum1_id, o.stratum2_id, o.total, o.min_value, o.max_value, o.avg_value, o.stdev_value
+;
+
+insert into @results_database_schema.ACHILLES_results_dist (analysis_id, stratum_1, stratum_2, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value)
+select analysis_id, stratum1_id, stratum2_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value
+from #tempResults
+;
+
+
+truncate table #rawData_9706;
+drop table #rawData_9706;
+
+truncate table #tempResults;
+drop table #tempResults;
+
+--}
+
+
+--{9709 IN (@list_of_analysis_ids)}?{
+-- 9709	Number of drug exposure records with invalid person_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, count_value)
+select 9709 as analysis_id,  
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+	left join @cdm_database_schema.PERSON p1
+	on p1.person_id = de1.person_id
+where p1.person_id is null
+;
+--}
+
+
+--{9710 IN (@list_of_analysis_ids)}?{
+-- 9710	Number of drug exposure records outside valid observation period
+insert into @results_database_schema.ACHILLES_results (analysis_id, count_value)
+select 9710 as analysis_id,  
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+	left join @cdm_database_schema.observation_period op1
+	on op1.person_id = de1.person_id
+	and de1.drug_exposure_start_date >= op1.observation_period_start_date
+	and de1.drug_exposure_start_date <= op1.observation_period_end_date
+where op1.person_id is null
+;
+--}
+
+
+--{9711 IN (@list_of_analysis_ids)}?{
+-- 9711	Number of drug exposure records with end date < start date
+insert into @results_database_schema.ACHILLES_results (analysis_id, count_value)
+select 9711 as analysis_id,  
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+where de1.drug_exposure_end_date < de1.drug_exposure_start_date
+;
+--}
+
+
+--{9712 IN (@list_of_analysis_ids)}?{
+-- 9712	Number of drug exposure records with invalid provider_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, count_value)
+select 9712 as analysis_id,  
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+	left join @cdm_database_schema.provider p1
+	on p1.provider_id = de1.provider_id
+where de1.provider_id is not null
+	and p1.provider_id is null
+;
+--}
+
+--{9713 IN (@list_of_analysis_ids)}?{
+-- 9713	Number of drug exposure records with invalid visit_id
+insert into @results_database_schema.ACHILLES_results (analysis_id, count_value)
+select 9713 as analysis_id,  
+	COUNT_BIG(de1.PERSON_ID) as count_value
+from
+	@cdm_database_schema.drug_exposure de1
+	left join @cdm_database_schema.visit_occurrence vo1
+	on de1.visit_occurrence_id = vo1.visit_occurrence_id
+where de1.visit_occurrence_id is not null
+	and vo1.visit_occurrence_id is null
+;
+--}
+
+
+--{9715 IN (@list_of_analysis_ids)}?{
+-- 9715	Distribution of days_supply by drug_source_concept_id
+with rawData(stratum_id, count_value) as
+(
+  select drug_source_concept_id,
+		days_supply as count_value
+	from @cdm_database_schema.drug_exposure 
+	where days_supply is not null
+),
+overallStats (stratum_id, avg_value, stdev_value, min_value, max_value, total) as
+(
+  select stratum_id,
+    CAST(avg(1.0 * count_value) AS FLOAT) as avg_value,
+    CAST(stdev(count_value) AS FLOAT) as stdev_value,
+    min(count_value) as min_value,
+    max(count_value) as max_value,
+    count_big(*) as total
+  FROM rawData
+	group by stratum_id
+),
+statsView (stratum_id, count_value, total, rn) as
+(
+  select stratum_id, count_value, count_big(*) as total, row_number() over (order by count_value) as rn
+  FROM rawData
+  group by stratum_id, count_value
+),
+priorStats (stratum_id, count_value, total, accumulated) as
+(
+  select s.stratum_id, s.count_value, s.total, sum(p.total) as accumulated
+  from statsView s
+  join statsView p on s.stratum_id = p.stratum_id and p.rn <= s.rn
+  group by s.stratum_id, s.count_value, s.total, s.rn
+)
+select 9715 as analysis_id,
+  CAST(o.stratum_id AS VARCHAR(255)) AS stratum_id,
+  o.total as count_value,
+  o.min_value,
+	o.max_value,
+	o.avg_value,
+	o.stdev_value,
+	MIN(case when p.accumulated >= .50 * o.total then count_value else o.max_value end) as median_value,
+	MIN(case when p.accumulated >= .10 * o.total then count_value else o.max_value end) as p10_value,
+	MIN(case when p.accumulated >= .25 * o.total then count_value else o.max_value end) as p25_value,
+	MIN(case when p.accumulated >= .75 * o.total then count_value else o.max_value end) as p75_value,
+	MIN(case when p.accumulated >= .90 * o.total then count_value else o.max_value end) as p90_value
+into #tempResults
+from priorStats p
+join overallStats o on p.stratum_id = o.stratum_id
+GROUP BY o.stratum_id, o.total, o.min_value, o.max_value, o.avg_value, o.stdev_value
+;
+
+insert into @results_database_schema.ACHILLES_results_dist (analysis_id, stratum_1, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value)
+select analysis_id, stratum_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value
+from #tempResults
+;
+
+truncate table #tempResults;
+drop table #tempResults;
+
+--}
+
+
+--{9716 IN (@list_of_analysis_ids)}?{
+-- 9716	Distribution of refills by drug_source_concept_id
+with rawData(stratum_id, count_value) as
+(
+  select drug_source_concept_id,
+    refills as count_value
+	from @cdm_database_schema.drug_exposure 
+	where refills is not null
+),
+overallStats (stratum_id, avg_value, stdev_value, min_value, max_value, total) as
+(
+  select stratum_id,
+    CAST(avg(1.0 * count_value) AS FLOAT) as avg_value,
+    CAST(stdev(count_value) AS FLOAT) as stdev_value,
+    min(count_value) as min_value,
+    max(count_value) as max_value,
+    count_big(*) as total
+  FROM rawData
+	group by stratum_id
+),
+statsView (stratum_id, count_value, total, rn) as
+(
+  select stratum_id, count_value, count_big(*) as total, row_number() over (order by count_value) as rn
+  FROM rawData
+  group by stratum_id, count_value
+),
+priorStats (stratum_id, count_value, total, accumulated) as
+(
+  select s.stratum_id, s.count_value, s.total, sum(p.total) as accumulated
+  from statsView s
+  join statsView p on s.stratum_id = p.stratum_id and p.rn <= s.rn
+  group by s.stratum_id, s.count_value, s.total, s.rn
+)
+select 9716 as analysis_id,
+  CAST(o.stratum_id AS VARCHAR(255)) AS stratum_id,
+  o.total as count_value,
+  o.min_value,
+	o.max_value,
+	o.avg_value,
+	o.stdev_value,
+	MIN(case when p.accumulated >= .50 * o.total then count_value else o.max_value end) as median_value,
+	MIN(case when p.accumulated >= .10 * o.total then count_value else o.max_value end) as p10_value,
+	MIN(case when p.accumulated >= .25 * o.total then count_value else o.max_value end) as p25_value,
+	MIN(case when p.accumulated >= .75 * o.total then count_value else o.max_value end) as p75_value,
+	MIN(case when p.accumulated >= .90 * o.total then count_value else o.max_value end) as p90_value
+into #tempResults
+from priorStats p
+join overallStats o on p.stratum_id = o.stratum_id
+GROUP BY o.stratum_id, o.total, o.min_value, o.max_value, o.avg_value, o.stdev_value
+;
+
+insert into @results_database_schema.ACHILLES_results_dist (analysis_id, stratum_1, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value)
+select analysis_id, stratum_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value
+from #tempResults
+;
+
+truncate table #tempResults;
+drop table #tempResults;
+
+--}
+
+
+
+--{9717 IN (@list_of_analysis_ids)}?{
+-- 9717	Distribution of quantity by drug_source_concept_id
+with rawData(stratum_id, count_value) as
+(
+  select drug_source_concept_id,
+    CAST(quantity AS FLOAT) as count_value
+  from @cdm_database_schema.drug_exposure 
+	where quantity is not null
+),
+overallStats (stratum_id, avg_value, stdev_value, min_value, max_value, total) as
+(
+  select stratum_id,
+    CAST(avg(1.0 * count_value) AS FLOAT) as avg_value,
+    CAST(stdev(count_value) AS FLOAT) as stdev_value,
+    min(count_value) as min_value,
+    max(count_value) as max_value,
+    count_big(*) as total
+  FROM rawData
+	group by stratum_id
+),
+statsView (stratum_id, count_value, total, rn) as
+(
+  select stratum_id, count_value, count_big(*) as total, row_number() over (order by count_value) as rn
+  FROM rawData
+  group by stratum_id, count_value
+),
+priorStats (stratum_id, count_value, total, accumulated) as
+(
+  select s.stratum_id, s.count_value, s.total, sum(p.total) as accumulated
+  from statsView s
+  join statsView p on s.stratum_id = p.stratum_id and p.rn <= s.rn
+  group by s.stratum_id, s.count_value, s.total, s.rn
+)
+select 9717 as analysis_id,
+  CAST(o.stratum_id AS VARCHAR(255)) AS stratum_id,
+  o.total as count_value,
+  o.min_value,
+	o.max_value,
+	o.avg_value,
+	o.stdev_value,
+	MIN(case when p.accumulated >= .50 * o.total then count_value else o.max_value end) as median_value,
+	MIN(case when p.accumulated >= .10 * o.total then count_value else o.max_value end) as p10_value,
+	MIN(case when p.accumulated >= .25 * o.total then count_value else o.max_value end) as p25_value,
+	MIN(case when p.accumulated >= .75 * o.total then count_value else o.max_value end) as p75_value,
+	MIN(case when p.accumulated >= .90 * o.total then count_value else o.max_value end) as p90_value
+into #tempResults
+from priorStats p
+join overallStats o on p.stratum_id = o.stratum_id
+GROUP BY o.stratum_id, o.total, o.min_value, o.max_value, o.avg_value, o.stdev_value
+;
+
+insert into @results_database_schema.ACHILLES_results_dist (analysis_id, stratum_1, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value)
+select analysis_id, stratum_id, count_value, min_value, max_value, avg_value, stdev_value, median_value, p10_value, p25_value, p75_value, p90_value
+from #tempResults
+;
+
+truncate table #tempResults;
+drop table #tempResults;
+
+--}
+
+--{9720 IN (@list_of_analysis_ids)}?{
+-- 9720	Number of drug exposure records by condition occurrence start month
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, count_value)
+select 9720 as analysis_id,   
+	CAST(YEAR(drug_exposure_start_date)*100 + month(drug_exposure_start_date) AS VARCHAR(255)) as stratum_1,
+	COUNT_BIG(PERSON_ID) as count_value
+from
+@cdm_database_schema.drug_exposure de1
+group by YEAR(drug_exposure_start_date)*100 + month(drug_exposure_start_date)
+;
+--}
+
+
+
+--{9791 IN (@list_of_analysis_ids)}?{
+-- 9791	Percentage of total persons that have at least x drug exposures
+create table #tempResults (d_concept_id int, drug_cnt int, person_cnt int);
+insert into #tempResults
+select drug_source_concept_id, drg_cnt, sum(count(person_id))
+over (partition by drug_source_concept_id order by drg_cnt desc)
+from (select d.drug_source_concept_id, 
+	count(d.drug_exposure_id) as drg_cnt, 
+	d.person_id
+	from @cdm_database_schema.drug_exposure d 
+	group by d.person_id, d.drug_source_concept_id) as cnt_q
+group by drug_source_concept_id, drg_cnt;
+
+with person_count as (select count(*) as total_persons from @cdm_database_schema.person)
+insert into @results_database_schema.ACHILLES_results (analysis_id, stratum_1, stratum_2, count_value)
+select 9791 as analysis_id,
+	d_concept_id as stratum_1, 
+	round((person_cnt * 100.0)/(total_persons * 1.0), 2) as stratum_2,
+	drug_cnt as count_value
+from #tempResults, person_count;
+
+truncate table #tempResults;
+drop table #tempResults;
+--}
 
 
 
@@ -7784,12 +8360,14 @@ where analysis_id <> 691
 	and analysis_id <> 791 
 	and analysis_id <> 891 
 	and analysis_id <> 1891 
+	and analysis_id <> 9791 
 	and count_value <= @smallcellcount;
 delete from @results_database_schema.ACHILLES_results_dist 
 where analysis_id <> 691 
 	and analysis_id <> 791
 	and analysis_id <> 891
 	and analysis_id <> 1891
+	and analysis_id <> 9791 
 	and count_value <= @smallcellcount;
 
 /**************************************************/

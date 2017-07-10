@@ -29,6 +29,7 @@
 #                "DEATH",
 #                "DRUG",
 #                "DRUG_ERA",
+#                "DRUG_SOURCE",
 #                "HEEL",
 #                "OBSERVATION",
 #                "OBSERVATION_PERIOD",
@@ -55,7 +56,7 @@ initOutputPath <- function (outputPath){
 #'
 #' @details
 #' exportToJson supports the following report types:
-#' "CONDITION","CONDITION_ERA", "DASHBOARD", "DATA_DENSITY", "DEATH", "DRUG", "DRUG_ERA", "HEEL", "META", "OBSERVATION", "OBSERVATION_PERIOD", "PERSON", "PROCEDURE","VISIT"
+#' "CONDITION","CONDITION_ERA", "DASHBOARD", "DATA_DENSITY", "DEATH", "DRUG", "DRUG_ERA", "DRUG_SOURCE", HEEL", "META", "OBSERVATION", "OBSERVATION_PERIOD", "PERSON", "PROCEDURE","VISIT"
 #' 
 #' @return none (opens the allReports vector in a View() display) 
 #' @examples \dontrun{
@@ -134,6 +135,12 @@ exportToJson <- function (connectionDetails, cdmDatabaseSchema, resultsDatabaseS
   {
     generateDrugTreemap(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion, vocabDatabaseSchema)  
     generateDrugReports(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion, vocabDatabaseSchema)
+  }
+  
+  if ("DRUG_SOURCE" %in% reports)
+  {
+    generateDrugSourceTreemap(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion, vocabDatabaseSchema)  
+    generateDrugSourceReports(conn, connectionDetails$dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion, vocabDatabaseSchema)
   }
   
   if ("HEEL" %in% reports)
@@ -345,6 +352,32 @@ exportDeathToJson <- function (connectionDetails, cdmDatabaseSchema, resultsData
 exportDrugToJson <- function (connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath = getwd(), cdmVersion="4", vocabDatabaseSchema = cdmDatabaseSchema)
 {
   exportToJson(connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, reports = c("DRUG"), cdmVersion, vocabDatabaseSchema)  
+}
+
+#' @title exportDrugSourceToJson
+#'
+#' @description
+#' \code{exportDrugSourceToJson} Exports Achilles Drug source report into a JSON form for reports.
+#'
+#' @details
+#' Creates individual files for Drug report found in Achilles.Web
+#' 
+#' 
+#' @param connectionDetails  An R object of type ConnectionDetail (details for the function that contains server info, database type, optionally username/password, port)
+#' @param cdmDatabaseSchema      Name of the database schema that contains the vocabulary files
+#' @param resultsDatabaseSchema  		Name of the database schema that contains the Achilles analysis files. Default is cdmDatabaseSchema
+#' @param outputPath		A folder location to save the JSON files. Default is current working folder
+#' @param vocabDatabaseSchema		string name of database schema that contains OMOP Vocabulary. Default is cdmDatabaseSchema. On SQL Server, this should specifiy both the database and the schema, so for example 'results.dbo'.
+#' 
+#' @return none 
+#' @examples \dontrun{
+#'   connectionDetails <- createConnectionDetails(dbms="sql server", server="yourserver")
+#'   exportDrugSourceToJson(connectionDetails, cdmDatabaseSchema="cdm4_sim", outputPath="your/output/path")
+#' }
+#' @export
+exportDrugSourceToJson <- function (connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath = getwd(), cdmVersion="4", vocabDatabaseSchema = cdmDatabaseSchema)
+{
+  exportToJson(connectionDetails, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, reports = c("DRUG_SOURCE"), cdmVersion, vocabDatabaseSchema)  
 }
 
 #' @title exportDrugEraToJson
@@ -669,6 +702,29 @@ generateDrugTreemap <- function(conn, dbms,cdmDatabaseSchema, resultsDatabaseSch
   dataDrugTreemap <- querySql(conn,queryDrugTreemap) 
   
   write(toJSON(dataDrugTreemap,method="C"),paste(outputPath, "/drug_treemap.json", sep=''))
+  progress = progress + 1
+  setTxtProgressBar(progressBar, progress)
+  
+  close(progressBar)  
+}
+
+
+generateDrugSourceTreemap <- function(conn, dbms,cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion = "4", vocabDatabaseSchema = cdmDatabaseSchema) {
+  writeLines("Generating drug source treemap")
+  progressBar <- txtProgressBar(max=1,style=3)
+  progress = 0
+  
+  queryDrugSourceTreemap <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlDrugSourceTreemap.sql",cdmVersion),
+                                             packageName = "Achilles",
+                                             dbms = dbms,
+                                             cdm_database_schema = cdmDatabaseSchema,
+                                             results_database_schema = resultsDatabaseSchema,
+                                             vocab_database_schema = vocabDatabaseSchema
+  )  
+  
+  dataDrugSourceTreemap <- querySql(conn,queryDrugSourceTreemap) 
+  
+  write(toJSON(dataDrugSourceTreemap,method="C"),paste(outputPath, "/drugsource_treemap.json", sep=''))
   progress = progress + 1
   setTxtProgressBar(progressBar, progress)
   
@@ -1095,6 +1151,131 @@ generateDrugReports <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSc
   }
   
   dummy <- lapply(uniqueConcepts, buildDrugReport)  
+  
+  setTxtProgressBar(progressBar, 1)
+  close(progressBar)
+}
+
+
+generateDrugSourceReports <- function(conn, dbms, cdmDatabaseSchema, resultsDatabaseSchema, outputPath, cdmVersion = "4", vocabDatabaseSchema = cdmDatabaseSchema) {
+  writeLines("Generating drug source reports")
+  
+  treemapFile <- file.path(outputPath,"drugsource_treemap.json")
+  if (!file.exists(treemapFile)){
+    writeLines(paste("Warning: treemap file",treemapFile,"does not exist. Skipping detail report generation."))
+    return()
+  }
+  
+  treemapData <- fromJSON(file = treemapFile)
+  uniqueConcepts <- unique(treemapData$CONCEPT_ID)
+  totalCount <- length(uniqueConcepts)
+  
+  drugsourceFolder <- file.path(outputPath,"drugsource")
+  if (file.exists(drugsourceFolder)){
+    writeLines(paste("Warning: folder ",drugsourceFolder," already exists"))
+  } else {
+    dir.create(paste(drugsourceFolder,"/",sep=""))
+  }
+  
+  progressBar <- txtProgressBar(style=3)
+  progress = 0
+  
+  queryAgeAtFirstExposure <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlAgeAtFirstExposure.sql",cdmVersion),
+                                                    packageName = "Achilles",
+                                                    dbms = dbms,
+                                                    cdm_database_schema = cdmDatabaseSchema,
+                                                    results_database_schema = resultsDatabaseSchema,
+                                                    vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryDaysSupplyDistribution <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlDaysSupplyDistribution.sql",cdmVersion),
+                                                        packageName = "Achilles",
+                                                        dbms = dbms,
+                                                        cdm_database_schema = cdmDatabaseSchema,
+                                                        results_database_schema = resultsDatabaseSchema,
+                                                        vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryDrugsByType <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlDrugsByType.sql",cdmVersion),
+                                             packageName = "Achilles",
+                                             dbms = dbms,
+                                             cdm_database_schema = cdmDatabaseSchema,
+                                             results_database_schema = resultsDatabaseSchema,
+                                             vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryPrevalenceByGenderAgeYear <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlPrevalenceByGenderAgeYear.sql",cdmVersion),
+                                                           packageName = "Achilles",
+                                                           dbms = dbms,
+                                                           cdm_database_schema = cdmDatabaseSchema,
+                                                           results_database_schema = resultsDatabaseSchema,
+                                                           vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryPrevalenceByMonth <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlPrevalenceByMonth.sql",cdmVersion),
+                                                   packageName = "Achilles",
+                                                   dbms = dbms,
+                                                   cdm_database_schema = cdmDatabaseSchema,
+                                                   results_database_schema = resultsDatabaseSchema,
+                                                   vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryDrugFrequencyDistribution <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlFrequencyDistribution.sql",cdmVersion), 
+                                                           packageName = "Achilles",
+                                                           dbms = dbms,
+                                                           cdm_database_schema = cdmDatabaseSchema,
+                                                           results_database_schema = resultsDatabaseSchema,
+                                                           vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryQuantityDistribution <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlQuantityDistribution.sql",cdmVersion),
+                                                      packageName = "Achilles",
+                                                      dbms = dbms,
+                                                      cdm_database_schema = cdmDatabaseSchema,
+                                                      results_database_schema = resultsDatabaseSchema,
+                                                      vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  queryRefillsDistribution <- loadRenderTranslateSql(sqlFilename = addCdmVersionPath("/drugsource/sqlRefillsDistribution.sql",cdmVersion),
+                                                     packageName = "Achilles",
+                                                     dbms = dbms,
+                                                     cdm_database_schema = cdmDatabaseSchema,
+                                                     results_database_schema = resultsDatabaseSchema,
+                                                     vocab_database_schema = vocabDatabaseSchema
+  )
+  
+  dataAgeAtFirstExposure <- querySql(conn,queryAgeAtFirstExposure) 
+  dataDaysSupplyDistribution <- querySql(conn,queryDaysSupplyDistribution) 
+  dataDrugsByType <- querySql(conn,queryDrugsByType) 
+  dataPrevalenceByGenderAgeYear <- querySql(conn,queryPrevalenceByGenderAgeYear) 
+  dataPrevalenceByMonth <- querySql(conn,queryPrevalenceByMonth)
+  dataDrugFrequencyDistribution <- querySql(conn,queryDrugFrequencyDistribution)
+  dataQuantityDistribution <- querySql(conn,queryQuantityDistribution) 
+  dataRefillsDistribution <- querySql(conn,queryRefillsDistribution) 
+  
+  buildDrugSourceReport <- function(concept_id) {
+    report <- {}
+    report$AGE_AT_FIRST_EXPOSURE <- dataAgeAtFirstExposure[dataAgeAtFirstExposure$DRUG_CONCEPT_ID == concept_id,c(2,3,4,5,6,7,8,9)]
+    report$DAYS_SUPPLY_DISTRIBUTION <- dataDaysSupplyDistribution[dataDaysSupplyDistribution$DRUG_CONCEPT_ID == concept_id, c(2,3,4,5,6,7,8,9)]
+    report$DRUGS_BY_TYPE <- dataDrugsByType[dataDrugsByType$DRUG_CONCEPT_ID == concept_id, c(3,4)]
+    report$PREVALENCE_BY_GENDER_AGE_YEAR <- dataPrevalenceByGenderAgeYear[dataPrevalenceByGenderAgeYear$CONCEPT_ID == concept_id,c(3,4,5,6)]  
+    report$PREVALENCE_BY_MONTH <- dataPrevalenceByMonth[dataPrevalenceByMonth$CONCEPT_ID == concept_id,c(3,4)]
+    report$DRUG_FREQUENCY_DISTRIBUTION <- dataDrugFrequencyDistribution[dataDrugFrequencyDistribution$CONCEPT_ID == concept_id,c(3,4)]
+    report$QUANTITY_DISTRIBUTION <- dataQuantityDistribution[dataQuantityDistribution$DRUG_CONCEPT_ID == concept_id, c(2,3,4,5,6,7,8,9)]
+    report$REFILLS_DISTRIBUTION <- dataRefillsDistribution[dataRefillsDistribution$DRUG_CONCEPT_ID == concept_id, c(2,3,4,5,6,7,8,9)]
+    
+    filename <- paste(outputPath, "/drugsource/drug_" , concept_id , ".json", sep='')  
+    
+    write(toJSON(report,method="C"),filename)  
+    
+    #Update progressbar:
+    env <- parent.env(environment())
+    curVal <- get("progress", envir = env)
+    assign("progress", curVal +1 ,envir= env)
+    setTxtProgressBar(get("progressBar", envir= env), (curVal + 1) / get("totalCount", envir= env))
+  }
+  
+  dummy <- lapply(uniqueConcepts, buildDrugSourceReport)  
   
   setTxtProgressBar(progressBar, 1)
   close(progressBar)
